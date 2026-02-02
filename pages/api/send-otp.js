@@ -1,4 +1,4 @@
-let otpStore = {};
+export let otpStore = {};
 
 export default async function handler(req, res) {
   if (req.method !== "POST") {
@@ -13,7 +13,6 @@ export default async function handler(req, res) {
 
   const otp = Math.floor(100000 + Math.random() * 900000).toString();
 
-  // Store OTP with 5 minute expiry
   otpStore[email] = {
     otp,
     expires: Date.now() + 5 * 60 * 1000
