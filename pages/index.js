@@ -1,4 +1,5 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
+import Head from "next/head";
 
 export default function Home() {
   const [verified, setVerified] = useState(false);
@@ -16,7 +17,8 @@ export default function Home() {
   const [startTime] = useState(Date.now());
   const [message, setMessage] = useState("");
 
-  // ----- OTP -----
+  // ---------------- OTP ----------------
+
   async function sendOTP() {
     const res = await fetch("/api/send-otp", {
       method: "POST",
@@ -47,7 +49,8 @@ export default function Home() {
     }
   }
 
-  // ----- AUDIO RECORD -----
+  // ---------------- AUDIO RECORD ----------------
+
   async function startRec(index, max) {
     const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
     const recorder = new MediaRecorder(stream);
@@ -56,7 +59,9 @@ export default function Home() {
 
     const timer = setInterval(() => {
       seconds++;
-      if (seconds >= max) stopRec(recorder, timer, stream, index);
+      if (seconds >= max) {
+        recorder.stop();
+      }
     }, 1000);
 
     recorder.ondataavailable = e => chunks.push(e.data);
@@ -79,13 +84,8 @@ export default function Home() {
     recorder.start();
   }
 
-  function stopRec(recorder, timer, stream, index) {
-    if (recorder && recorder.state === "recording") {
-      recorder.stop();
-    }
-  }
+  // ---------------- SUBMIT ----------------
 
-  // ----- SUBMIT -----
   async function submit() {
     if (!verified) {
       alert("Verify email first");
@@ -117,65 +117,95 @@ export default function Home() {
   }
 
   return (
-    <div style={{
-      background: "#000",
-      color: "#fff",
-      padding: 30,
-      maxWidth: 760,
-      margin: "auto",
-      minHeight: "100vh"
-    }}>
-      <h2>Voice Gig</h2>
+    <>
+      <Head>
+        <style>{`
+          body {
+            margin: 0;
+            background: #000;
+          }
+        `}</style>
+      </Head>
 
-      <input
-        placeholder="Name"
-        value={name}
-        onChange={e => setName(e.target.value)}
-        style={inputStyle}
-      />
+      <div
+        style={{
+          background: "#000",
+          minHeight: "100vh",
+          padding: 40,
+          color: "#fff"
+        }}
+      >
+        <div style={{ maxWidth: 700, margin: "0 auto" }}>
+          <h2 style={{ marginBottom: 20 }}>Voice Gig</h2>
 
-      <input
-        placeholder="Email"
-        value={email}
-        onChange={e => setEmail(e.target.value)}
-        style={inputStyle}
-      />
+          <input
+            placeholder="Name"
+            value={name}
+            onChange={e => setName(e.target.value)}
+            style={inputStyle}
+          />
 
-      <button onClick={sendOTP}>Send OTP</button>
+          <input
+            placeholder="Email"
+            value={email}
+            onChange={e => setEmail(e.target.value)}
+            style={inputStyle}
+          />
 
-      <br /><br />
+          <button style={btnStyle} onClick={sendOTP}>
+            Send OTP
+          </button>
 
-      <input
-        placeholder="OTP"
-        value={otp}
-        onChange={e => setOtp(e.target.value)}
-        style={inputStyle}
-      />
+          <input
+            placeholder="OTP"
+            value={otp}
+            onChange={e => setOtp(e.target.value)}
+            style={inputStyle}
+          />
 
-      <button onClick={verifyOTP}>Verify</button>
+          <button style={btnStyle} onClick={verifyOTP}>
+            Verify
+          </button>
 
-      <br /><br />
+          <div style={{ marginTop: 30 }}>
+            <p>Task 1: Record 30 seconds</p>
+            <button
+              style={btnStyle}
+              onClick={() => startRec(0, 30)}
+            >
+              Start
+            </button>
+          </div>
 
-      <div>
-        <p>Task 1: Record 30 seconds</p>
-        <button onClick={() => startRec(0, 30)}>Start</button>
+          <button
+            style={{ ...btnStyle, marginTop: 30 }}
+            onClick={submit}
+          >
+            SUBMIT
+          </button>
+
+          <p style={{ marginTop: 20 }}>{message}</p>
+        </div>
       </div>
-
-      <br />
-
-      <button onClick={submit}>SUBMIT</button>
-
-      <p>{message}</p>
-    </div>
+    </>
   );
 }
 
 const inputStyle = {
   width: "100%",
-  padding: 10,
-  marginBottom: 10,
+  padding: 12,
+  marginBottom: 12,
   background: "#111",
   color: "#fff",
-  border: "1px solid #444",
+  border: "1px solid #333",
   borderRadius: 6
+};
+
+const btnStyle = {
+  padding: "8px 16px",
+  background: "#222",
+  color: "#fff",
+  border: "1px solid #444",
+  cursor: "pointer",
+  marginBottom: 10
 };
