@@ -34,7 +34,6 @@ export default async function handler(req, res) {
     });
 
     const rows = existing.data.values || [];
-
     let fraud = [];
 
     rows.forEach(r => {
@@ -53,6 +52,57 @@ export default async function handler(req, res) {
       if (r[16] === audioHash) fraud.push("DUP_AUDIO");
     });
 
+    // ---------------- REFERRAL VALIDATION ----------------
+
+    let referralName = "";
+    let referralEmail = "";
+    let referralUniversity = "";
+
+    const referralCode = data.fields?.referral_code;
+
+    if (referralCode) {
+      const referralSheet = await sheets.spreadsheets.values.get({
+        spreadsheetId: process.env.GOOGLE_SHEET_ID,
+        range: "REFERRALS!A2:G"
+      });
+
+      const referrals = referralSheet.data.values || [];
+
+      for (let i = 0; i < referrals.length; i++) {
+        const r = referrals[i];
+
+        const code = r[0];
+        const name = r[1];
+        const email = r[2];
+        const university = r[3];
+        const status = r[4];
+        const maxUses = Number(r[5] || 0);
+        const usedCount = Number(r[6] || 0);
+
+        if (
+          code === referralCode &&
+          status === "ACTIVE" &&
+          usedCount < maxUses
+        ) {
+          referralName = name;
+          referralEmail = email;
+          referralUniversity = university;
+
+          // increment used count
+          await sheets.spreadsheets.values.update({
+            spreadsheetId: process.env.GOOGLE_SHEET_ID,
+            range: `REFERRALS!G${i + 2}`,
+            valueInputOption: "RAW",
+            requestBody: {
+              values: [[usedCount + 1]]
+            }
+          });
+
+          break;
+        }
+      }
+    }
+
     // ---------------- CREATE DRIVE FOLDER ----------------
 
     const folder = await drive.files.create({
@@ -64,8 +114,6 @@ export default async function handler(req, res) {
     });
 
     const folderId = folder.data.id;
-
-    // ---------------- UPLOAD AUDIO FILES ----------------
 
     let audioLinks = [];
 
@@ -97,13 +145,19 @@ export default async function handler(req, res) {
       );
     }
 
-    // ---------------- BUILD SHEET ROW ----------------
+    // ---------------- BUILD SUBMISSION ROW ----------------
 
     const row = [
-      new Date().toISOString(), // Timestamp
+      new Date().toISOString(),
       data.name,
       data.email,
-      "", "", "", "", "", "", "", // reserved fields
+      data.fields?.phone || "",
+      data.fields?.city || "",
+      data.fields?.experience_years || "",
+      data.fields?.primary_skill || "",
+      referralName,
+      referralEmail,
+      referralUniversity,
       audioLinks[0] || "",
       audioLinks[1] || "",
       audioLinks[2] || "",
