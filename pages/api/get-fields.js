@@ -2,10 +2,21 @@ import { google } from "googleapis";
 
 export default async function handler(req, res) {
   try {
+    if (!process.env.GOOGLE_CLIENT_EMAIL)
+      return res.status(500).json({ error: "Missing GOOGLE_CLIENT_EMAIL" });
+
+    if (!process.env.GOOGLE_PRIVATE_KEY)
+      return res.status(500).json({ error: "Missing GOOGLE_PRIVATE_KEY" });
+
+    if (!process.env.GOOGLE_SHEET_ID)
+      return res.status(500).json({ error: "Missing GOOGLE_SHEET_ID" });
+
     const auth = new google.auth.JWT(
       process.env.GOOGLE_CLIENT_EMAIL,
       null,
-      process.env.GOOGLE_PRIVATE_KEY.replace(/\\n/g, "\n"),
+      (process.env.GOOGLE_PRIVATE_KEY || "")
+        .split("\\n")
+        .join("\n"),
       ["https://www.googleapis.com/auth/spreadsheets.readonly"]
     );
 
@@ -27,10 +38,10 @@ export default async function handler(req, res) {
         options: r[3]
       }));
 
-    res.status(200).json(fields);
+    return res.status(200).json(fields);
 
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ error: "Failed to fetch fields" });
+    console.error("FIELDS ERROR:", error);
+    return res.status(500).json({ error: error.message });
   }
 }
