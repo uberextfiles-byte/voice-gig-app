@@ -10,6 +10,10 @@ export default function Home() {
   const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(false);
 
+  const [recording, setRecording] = useState(false);
+  const [seconds, setSeconds] = useState(0);
+  const [saved, setSaved] = useState(false);
+
   const [browserId] = useState(
     typeof window !== "undefined"
       ? localStorage.getItem("BID") ||
@@ -57,12 +61,19 @@ export default function Home() {
   async function startRec(index, max) {
     const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
     const recorder = new MediaRecorder(stream);
+
     let chunks = [];
-    let seconds = 0;
+    let sec = 0;
+
+    setRecording(true);
+    setSaved(false);
+    setSeconds(0);
 
     const timer = setInterval(() => {
-      seconds++;
-      if (seconds >= max) {
+      sec++;
+      setSeconds(sec);
+
+      if (sec >= max) {
         recorder.stop();
       }
     }, 1000);
@@ -71,6 +82,9 @@ export default function Home() {
 
     recorder.onstop = () => {
       clearInterval(timer);
+      setRecording(false);
+      setSaved(true);
+
       const reader = new FileReader();
       reader.onloadend = () => {
         const base64 = reader.result.split(",")[1];
@@ -80,6 +94,7 @@ export default function Home() {
           return copy;
         });
       };
+
       reader.readAsDataURL(new Blob(chunks, { type: "audio/webm" }));
       stream.getTracks().forEach(t => t.stop());
     };
@@ -190,12 +205,27 @@ export default function Home() {
 
           <div style={{ marginTop: 30 }}>
             <p>Task 1: Record 30 seconds</p>
-            <button
-              style={btnStyle}
-              onClick={() => startRec(0, 30)}
-            >
-              Start Recording
-            </button>
+
+            {!recording && (
+              <button
+                style={btnStyle}
+                onClick={() => startRec(0, 30)}
+              >
+                Start Recording
+              </button>
+            )}
+
+            {recording && (
+              <div style={{ marginTop: 10, color: "#ff4d4d" }}>
+                🔴 Recording... {seconds}s
+              </div>
+            )}
+
+            {saved && !recording && (
+              <div style={{ marginTop: 10, color: "#00ff88" }}>
+                ✅ Recording saved
+              </div>
+            )}
           </div>
 
           <button
