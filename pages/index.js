@@ -1,7 +1,11 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Head from "next/head";
 
 export default function Home() {
+  const [settings, setSettings] = useState({});
+  const [fields, setFields] = useState([]);
+  const [tasks, setTasks] = useState([]);
+
   const [verified, setVerified] = useState(false);
   const [email, setEmail] = useState("");
   const [name, setName] = useState("");
@@ -10,9 +14,9 @@ export default function Home() {
   const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(false);
 
-  const [recording, setRecording] = useState(false);
+  const [recordingIndex, setRecordingIndex] = useState(null);
   const [seconds, setSeconds] = useState(0);
-  const [saved, setSaved] = useState(false);
+  const [savedIndex, setSavedIndex] = useState(null);
 
   const [browserId] = useState(
     typeof window !== "undefined"
@@ -23,6 +27,29 @@ export default function Home() {
   );
 
   const [startTime] = useState(Date.now());
+
+  // ---------------- LOAD CONFIG ----------------
+
+  useEffect(() => {
+    fetch("/api/get-settings")
+      .then(r => r.json())
+      .then(data => setSettings(data))
+      .catch(() => {});
+
+    fetch("/api/get-fields")
+      .then(r => r.json())
+      .then(data => setFields(data))
+      .catch(() => {});
+
+    fetch("/api/get-tasks")
+      .then(r => r.json())
+      .then(data => setTasks(data))
+      .catch(() => {});
+  }, []);
+
+  if (settings.GigOpen === "NO") {
+    return <h2 style={{ padding: 40 }}>Gig is currently closed</h2>;
+  }
 
   // ---------------- OTP ----------------
 
@@ -35,7 +62,7 @@ export default function Home() {
 
     const data = await res.json();
     if (data.success) {
-      setMessage("OTP sent (use 123456)");
+      setMessage("OTP sent");
     }
   }
 
@@ -56,7 +83,7 @@ export default function Home() {
     }
   }
 
-  // ---------------- AUDIO RECORD ----------------
+  // ---------------- RECORD ----------------
 
   async function startRec(index, max) {
     const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -65,25 +92,23 @@ export default function Home() {
     let chunks = [];
     let sec = 0;
 
-    setRecording(true);
-    setSaved(false);
+    setRecordingIndex(index);
+    setSavedIndex(null);
     setSeconds(0);
 
     const timer = setInterval(() => {
       sec++;
       setSeconds(sec);
 
-      if (sec >= max) {
-        recorder.stop();
-      }
+      if (sec >= max) recorder.stop();
     }, 1000);
 
     recorder.ondataavailable = e => chunks.push(e.data);
 
     recorder.onstop = () => {
       clearInterval(timer);
-      setRecording(false);
-      setSaved(true);
+      setRecordingIndex(null);
+      setSavedIndex(index);
 
       const reader = new FileReader();
       reader.onloadend = () => {
@@ -105,143 +130,128 @@ export default function Home() {
   // ---------------- SUBMIT ----------------
 
   async function submit() {
-    if (!verified) {
-      alert("Verify email first");
-      return;
-    }
-
-    if (!name || !email) {
-      alert("Fill all required fields");
-      return;
-    }
-
-    if (!audios[0]) {
-      alert("Record audio before submitting");
-      return;
-    }
+    if (!verified) return alert("Verify email first");
 
     setLoading(true);
 
-    try {
-      const payload = {
-        name,
-        email,
-        audios,
-        browserId,
-        submitTime: Math.floor((Date.now() - startTime) / 1000),
-        emailVerified: true
-      };
+    const dynamicFields = {};
+    fields.forEach(f => {
+      dynamicFields[f.key] =
+        document.getElementById(f.key)?.value || "";
+    });
 
-      const res = await fetch("/api/submit", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload)
-      });
+    const payload = {
+      name,
+      email,
+      fields: dynamicFields,
+      audios,
+      browserId,
+      submitTime: Math.floor((Date.now() - startTime) / 1000),
+      emailVerified: true
+    };
 
-      const data = await res.json();
+    const res = await fetch("/api/submit", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload)
+    });
 
-      if (data.success) {
-        setMessage("Application submitted successfully 🚀");
-      } else {
-        setMessage("Submission failed ❌");
-      }
-    } catch (err) {
-      setMessage("Server error ❌");
-    }
+    const data = await res.json();
 
+    setMessage(data.success ? "Submitted 🚀" : "Failed ❌");
     setLoading(false);
   }
 
   return (
     <>
       <Head>
-        <style>{`
-          body {
-            margin: 0;
-            background: #000;
-          }
-        `}</style>
+        <style>{`body{margin:0;background:#000}`}</style>
       </Head>
 
-      <div
-        style={{
-          background: "#000",
-          minHeight: "100vh",
-          padding: 40,
-          color: "#fff"
-        }}
-      >
-        <div style={{ maxWidth: 700, margin: "0 auto" }}>
-          <h2 style={{ marginBottom: 20 }}>Voice Gig</h2>
+      <div style={{ padding: 40, color: "#fff" }}>
+        <h2>{settings.Title || "Voice Gig"}</h2>
 
-          <input
-            placeholder="Name"
-            value={name}
-            onChange={e => setName(e.target.value)}
-            style={inputStyle}
-          />
+        <input
+          placeholder="Name"
+          value={name}
+          onChange={e => setName(e.target.value)}
+          style={inputStyle}
+        />
 
-          <input
-            placeholder="Email"
-            value={email}
-            onChange={e => setEmail(e.target.value)}
-            style={inputStyle}
-          />
+        <input
+          placeholder="Email"
+          value={email}
+          onChange={e => setEmail(e.target.value)}
+          style={inputStyle}
+        />
 
-          <button style={btnStyle} onClick={sendOTP}>
-            Send OTP
-          </button>
+        <button style={btnStyle} onClick={sendOTP}>Send OTP</button>
 
-          <input
-            placeholder="OTP"
-            value={otp}
-            onChange={e => setOtp(e.target.value)}
-            style={inputStyle}
-          />
+        <input
+          placeholder="OTP"
+          value={otp}
+          onChange={e => setOtp(e.target.value)}
+          style={inputStyle}
+        />
 
-          <button style={btnStyle} onClick={verifyOTP}>
-            Verify
-          </button>
+        <button style={btnStyle} onClick={verifyOTP}>Verify</button>
 
-          <div style={{ marginTop: 30 }}>
-            <p>Task 1: Record 30 seconds</p>
+        {/* Dynamic Fields */}
+        {fields.map(f => (
+          f.type === "dropdown" ? (
+            <select key={f.key} id={f.key} style={inputStyle}>
+              <option value="">Select {f.label}</option>
+              {f.options?.split(",").map(o => (
+                <option key={o}>{o.trim()}</option>
+              ))}
+            </select>
+          ) : (
+            <input
+              key={f.key}
+              id={f.key}
+              placeholder={f.label}
+              style={inputStyle}
+            />
+          )
+        ))}
 
-            {!recording && (
+        {/* Dynamic Tasks */}
+        {tasks.map((t, i) => (
+          <div key={i} style={{ marginTop: 20 }}>
+            <p>{t.text}</p>
+
+            {recordingIndex !== i && (
               <button
                 style={btnStyle}
-                onClick={() => startRec(0, 30)}
+                onClick={() => startRec(i, t.max)}
               >
                 Start Recording
               </button>
             )}
 
-            {recording && (
-              <div style={{ marginTop: 10, color: "#ff4d4d" }}>
+            {recordingIndex === i && (
+              <div style={{ color: "#ff4d4d" }}>
                 🔴 Recording... {seconds}s
               </div>
             )}
 
-            {saved && !recording && (
-              <div style={{ marginTop: 10, color: "#00ff88" }}>
+            {savedIndex === i && (
+              <div style={{ color: "#00ff88" }}>
                 ✅ Recording saved
               </div>
             )}
           </div>
+        ))}
 
-          <button
-            style={{
-              ...btnStyle,
-              marginTop: 30,
-              opacity: loading ? 0.6 : 1
-            }}
-            onClick={submit}
-            disabled={loading}
-          >
-            {loading ? "Submitting..." : "SUBMIT"}
-          </button>
+        <button
+          style={{ ...btnStyle, marginTop: 30 }}
+          onClick={submit}
+          disabled={loading}
+        >
+          {loading ? "Submitting..." : "SUBMIT"}
+        </button>
 
-          <p style={{ marginTop: 20 }}>{message}</p>
-        </div>
+        <p style={{ marginTop: 20 }}>{message}</p>
       </div>
     </>
   );
