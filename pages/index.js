@@ -7,6 +7,9 @@ export default function Home() {
   const [name, setName] = useState("");
   const [otp, setOtp] = useState("");
   const [audios, setAudios] = useState([]);
+  const [message, setMessage] = useState("");
+  const [loading, setLoading] = useState(false);
+
   const [browserId] = useState(
     typeof window !== "undefined"
       ? localStorage.getItem("BID") ||
@@ -14,8 +17,8 @@ export default function Home() {
           localStorage.getItem("BID"))
       : ""
   );
+
   const [startTime] = useState(Date.now());
-  const [message, setMessage] = useState("");
 
   // ---------------- OTP ----------------
 
@@ -92,28 +95,46 @@ export default function Home() {
       return;
     }
 
-    const payload = {
-      name,
-      email,
-      audios,
-      browserId,
-      submitTime: Math.floor((Date.now() - startTime) / 1000),
-      emailVerified: true
-    };
-
-    const res = await fetch("/api/submit", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload)
-    });
-
-    const data = await res.json();
-
-    if (data.success) {
-      setMessage("Thank you! 🚀");
-    } else {
-      setMessage("Submission failed");
+    if (!name || !email) {
+      alert("Fill all required fields");
+      return;
     }
+
+    if (!audios[0]) {
+      alert("Record audio before submitting");
+      return;
+    }
+
+    setLoading(true);
+
+    try {
+      const payload = {
+        name,
+        email,
+        audios,
+        browserId,
+        submitTime: Math.floor((Date.now() - startTime) / 1000),
+        emailVerified: true
+      };
+
+      const res = await fetch("/api/submit", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+      });
+
+      const data = await res.json();
+
+      if (data.success) {
+        setMessage("Application submitted successfully 🚀");
+      } else {
+        setMessage("Submission failed ❌");
+      }
+    } catch (err) {
+      setMessage("Server error ❌");
+    }
+
+    setLoading(false);
   }
 
   return (
@@ -173,15 +194,20 @@ export default function Home() {
               style={btnStyle}
               onClick={() => startRec(0, 30)}
             >
-              Start
+              Start Recording
             </button>
           </div>
 
           <button
-            style={{ ...btnStyle, marginTop: 30 }}
+            style={{
+              ...btnStyle,
+              marginTop: 30,
+              opacity: loading ? 0.6 : 1
+            }}
             onClick={submit}
+            disabled={loading}
           >
-            SUBMIT
+            {loading ? "Submitting..." : "SUBMIT"}
           </button>
 
           <p style={{ marginTop: 20 }}>{message}</p>
