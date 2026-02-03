@@ -1,15 +1,49 @@
-export default function handler(req, res) {
-  if (req.method !== "POST") {
-    return res.status(405).json({ message: "Method not allowed" });
-  }
+const [loading, setLoading] = useState(false);
 
-  const { name, email } = req.body;
+async function submit() {
+  if (!verified) {
+    alert("Verify email first");
+    return;
+  }
 
   if (!name || !email) {
-    return res.status(400).json({ success: false, message: "Missing fields" });
+    alert("Fill all required fields");
+    return;
   }
 
-  console.log("New submission:", { name, email });
+  if (!audios[0]) {
+    alert("Record audio before submitting");
+    return;
+  }
 
-  return res.status(200).json({ success: true });
+  setLoading(true);
+
+  try {
+    const payload = {
+      name,
+      email,
+      audios,
+      browserId,
+      submitTime: Math.floor((Date.now() - startTime) / 1000),
+      emailVerified: true
+    };
+
+    const res = await fetch("/api/submit", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload)
+    });
+
+    const data = await res.json();
+
+    if (data.success) {
+      setMessage("Application submitted successfully 🚀");
+    } else {
+      setMessage("Submission failed ❌");
+    }
+  } catch (err) {
+    setMessage("Server error ❌");
+  }
+
+  setLoading(false);
 }
